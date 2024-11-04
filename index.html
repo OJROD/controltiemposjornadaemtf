@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Control de Tiempos Jornada Conductores EMT Fuenlabrada</title>
+    <style>
+        /* Estilos generales */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #e9ecef;
+            margin: 0;
+            padding: 0;
+        }
+        h1, h2, h3 {
+            text-align: center;
+            color: #343a40;
+        }
+        /* Estilo del formulario */
+        form {
+            background-color: #ffffff;
+            margin: 20px auto;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 800px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        form label {
+            display: block;
+            margin-bottom: 5px;
+            color: #495057;
+            font-weight: bold;
+        }
+        form input, form select, form button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+        }
+        form input:focus {
+            border-color: #80bdff;
+            outline: none;
+        }
+        .botones-accion {
+            display: flex;
+            justify-content: space-between;
+        }
+        .botones-accion button {
+            width: 32%;
+            background-color: #007bff;
+            color: #ffffff;
+            border: none;
+            cursor: pointer;
+            margin-bottom: 0;
+        }
+        .botones-accion button:hover {
+            background-color: #0056b3;
+        }
+        /* Estilo de las tablas */
+        table {
+            border-collapse: collapse;
+            width: 95%;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        table th, table td {
+            padding: 12px 15px;
+            text-align: center;
+            color: #495057;
+            border-bottom: 1px solid #dee2e6;
+        }
+        table th {
+            background-color: #343a40;
+            color: #ffffff;
+            font-weight: bold;
+        }
+        table tbody tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .dia-libre {
+            background-color: #d1ecf1 !important;
+        }
+        .exceso-jornada {
+            background-color: #fff3cd !important; /* Fondo amarillo claro */
+            font-weight: bold; /* Números en negrita */
+            color: #856404; /* Texto color oscuro */
+        }
+        /* Botón de descargar CSV */
+        .boton-csv {
+            display: inline-block;
+            margin: 10px;
+            padding: 8px 12px;
+            background-color: #28a745;
+            color: #ffffff;
+            text-align: center;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .boton-csv:hover {
+            background-color: #218838;
+        }
+        /* Botón de eliminar registros */
+        .boton-eliminar {
+            display: block;
+            width: 200px;
+            margin: 20px auto;
+            padding: 10px;
+            background-color: #dc3545;
+            color: #ffffff;
+            text-align: center;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .boton-eliminar:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Control de Tiempos Jornada Conductores EMT Fuenlabrada</h1>
+
+<form id="formulario">
+    <label>Fecha:</label>
+    <input type="date" id="fecha" required>
+
+    <label>Número de Conductor:</label>
+    <input type="number" id="numeroConductor" required>
+
+    <label>Línea:</label>
+    <input type="text" id="linea" required>
+
+    <label>Número de Turno:</label>
+    <input type="number" id="numeroTurno" required>
+
+    <label>Hora de Inicio en la Hoja de Servicios:</label>
+    <input type="time" id="horaInicioHoja" required>
+
+    <label>Hora de Fin en la Hoja de Servicios:</label>
+    <input type="time" id="horaFinHoja" required>
+
+    <label>Login en la Máquina Expendedora:</label>
+    <div class="botones-accion">
+        <input type="time" id="login" required>
+        <button type="button" onclick="autoCompletarHora('login')">Añadir Hora Actual</button>
+    </div>
+
+    <label>Logout en la Máquina Expendedora:</label>
+    <div class="botones-accion">
+        <input type="time" id="logout" required>
+        <button type="button" onclick="autoCompletarHora('logout')">Añadir Hora Actual</button>
+    </div>
+
+    <label>Número de Autobús:</label>
+    <input type="text" id="numeroAutobus" required>
+
+    <label>Número Total de Viajeros:</label>
+    <input type="number" id="totalViajeros" required>
+
+    <label>Venta Total de Billetes:</label>
+    <input type="number" id="ventaBilletes" required>
+
+    <label>Observaciones:</label>
+    <input type="text" id="observaciones">
+
+    <div class="botones-accion">
+        <button type="button" onclick="guardarRegistro()">Guardar Registro</button>
+        <button type="reset">Limpiar Formulario</button>
+        <button type="button" onclick="diaLibre()">Día Libre</button>
+    </div>
+</form>
+
+<div id="contenedorTablas">
+    <!-- Las tablas mensuales y anuales se insertarán aquí -->
+</div>
+
+<button class="boton-eliminar" onclick="eliminarRegistros()">Eliminar Registros</button>
+
+<script>
+    // Variables globales
+    let registros = [];
+    let registrosPorAño = {};
+
+    // Funciones globales
+    function guardarRegistrosLocalStorage() {
+        localStorage.setItem('registros', JSON.stringify(registros));
+    }
+
+    function autoCompletarHora(campo) {
+        const ahora = new Date();
+        const horas = ('0' + ahora.getHours()).slice(-2);
+        const minutos = ('0' + ahora.getMinutes()).slice(-2);
+        document.getElementById(campo).value = `${horas}:${minutos}`;
+    }
+
+    function guardarRegistro() {
+        const registro = {
+            fecha: document.getElementById('fecha').value,
+            numeroConductor: document.getElementById('numeroConductor').value,
+            linea: document.getElementById('linea').value,
+            numeroTurno: document.getElementById('numeroTurno').value,
+            horaInicioHoja: document.getElementById('horaInicioHoja').value,
+            horaFinHoja: document.getElementById('horaFinHoja').value,
+            login: document.getElementById('login').value,
+            logout: document.getElementById('logout').value,
+            numeroAutobus: document.getElementById('numeroAutobus').value,
+            totalViajeros: parseInt(document.getElementById('totalViajeros').value) || 0,
+            ventaBilletes: parseInt(document.getElementById('ventaBilletes').value) || 0,
+            observaciones: document.getElementById('observaciones').value || '',
+            diaLibre: false
+        };
+
+        // Cálculos de tiempos
+        registro.tiempoTotalHoja = calcularDiferenciaHoras(registro.horaInicioHoja, registro.horaFinHoja);
+        registro.tiempoOperativo = calcularDiferenciaHoras(registro.login, registro.logout);
+
+        // Exceso de jornada
+        const excesoMinutos = calcularExcesoJornada(registro.horaFinHoja, registro.logout);
+        if (excesoMinutos > 0) {
+            registro.excesoJornada = minutosAHoraMinutos(excesoMinutos);
+        } else {
+            registro.excesoJornada = '00:00';
+        }
+
+        // Liquidación total
+        registro.liquidacionTotal = (registro.ventaBilletes * 1.30).toFixed(2);
+
+        // Guardar o actualizar el registro
+        const indice = registros.findIndex(r => r.fecha === registro.fecha);
+        if (indice >= 0) {
+            registros[indice] = registro;
+        } else {
+            registros.push(registro);
+        }
+
+        guardarRegistrosLocalStorage();
+        actualizarTablas();
+        document.getElementById('formulario').reset();
+    }
+
+    function diaLibre() {
+        const fecha = document.getElementById('fecha').value;
+        const numeroConductor = document.getElementById('numeroConductor').value;
+
+        if (!fecha || !numeroConductor) {
+            alert('Debe seleccionar una fecha y número de conductor.');
+            return;
+        }
+
+        const registro = {
+            fecha,
+            numeroConductor,
+            linea: 'DÍA LIBRE',
+            numeroTurno: '0',
+            horaInicioHoja: '00:00',
+            horaFinHoja: '00:00',
+            login: '00:00',
+            logout: '00:00',
+            numeroAutobus: '0',
+            totalViajeros: 0,
+            ventaBilletes: 0,
+            observaciones: 'DÍA LIBRE',
+            diaLibre: true,
+            tiempoTotalHoja: '00:00',
+            tiempoOperativo: '00:00',
+            excesoJornada: '00:00',
+            liquidacionTotal: '0.00'
+        };
+
+        // Guardar o actualizar el registro
+        const indice = registros.findIndex(r => r.fecha === registro.fecha);
+        if (indice >= 0) {
+            registros[indice] = registro;
+        } else {
+            registros.push(registro);
+        }
+
+        guardarRegistrosLocalStorage();
+        actualizarTablas();
+        document.getElementById('formulario').reset();
+    }
+
+    function calcularDiferenciaHoras(inicio, fin) {
+        const [hInicio, mInicio] = inicio.split(':').map(Number);
+        const [hFin, mFin] = fin.split(':').map(Number);
+
+        let minutosInicio = hInicio * 60 + mInicio;
+        let minutosFin = hFin * 60 + mFin;
+
+        if (minutosFin < minutosInicio) {
+            minutosFin += 24 * 60; // Para casos de cambio de día
+        }
+
+        const diferencia = minutosFin - minutosInicio;
+        return minutosAHoraMinutos(diferencia);
+    }
+
+    function calcularExcesoJornada(horaFinHoja, logout) {
+        const [hFinHoja, mFinHoja] = horaFinHoja.split(':').map(Number);
+        const [hLogout, mLogout] = logout.split(':').map(Number);
+
+        let minutosFinHoja = hFinHoja * 60 + mFinHoja;
+        let minutosLogout = hLogout * 60 + mLogout;
+
+        // Si logout es menor que Hora Fin y la diferencia no es significativa, no hay exceso
+        if (minutosLogout < minutosFinHoja && (minutosFinHoja - minutosLogout) < 720) {
+            return 0;
+        }
+
+        if (minutosLogout < minutosFinHoja) {
+            minutosLogout += 24 * 60; // Para casos de cambio de día
+        }
+
+        if (minutosLogout > minutosFinHoja) {
+            return minutosLogout - minutosFinHoja;
+        } else {
+            return 0;
+        }
+    }
+
+    function minutosAHoraMinutos(minutosTotales) {
+        const horas = Math.floor(minutosTotales / 60);
+        const minutos = minutosTotales % 60;
+        return ('0' + horas).slice(-2) + ':' + ('0' + minutos).slice(-2);
+    }
+
+    function sumarTiempos(tiempos) {
+        let totalMinutos = 0;
+
+        tiempos.forEach(tiempo => {
+            if (tiempo && tiempo.includes(':')) {
+                const [h, m] = tiempo.split(':').map(Number);
+                totalMinutos += h * 60 + m;
+            }
+        });
+
+        return minutosAHoraMinutos(totalMinutos);
+    }
+
+    function actualizarTablas() {
+        const contenedorTablas = document.getElementById('contenedorTablas');
+        contenedorTablas.innerHTML = '';
+
+        registrosPorAño = {};
+
+        // Agrupar registros por año y mes
+        registros.forEach(registro => {
+            const fechaRegistro = new Date(registro.fecha);
+            const año = fechaRegistro.getFullYear();
+            const mes = fechaRegistro.getMonth() + 1; // Enero es 0
+            const mesClave = `${año}-${('0' + mes).slice(-2)}`;
+
+            if (!registrosPorAño[año]) {
+                registrosPorAño[año] = {};
+            }
+            if (!registrosPorAño[año][mesClave]) {
+                registrosPorAño[año][mesClave] = [];
+            }
+            registrosPorAño[año][mesClave].push(registro);
+        });
+
+        // Ordenar los años de forma descendente
+        const añosOrdenados = Object.keys(registrosPorAño).sort((a, b) => b - a);
+
+        añosOrdenados.forEach(año => {
+            const meses = registrosPorAño[año];
+            const mesesOrdenados = Object.keys(meses).sort((a, b) => b.localeCompare(a));
+
+            mesesOrdenados.forEach(mesClave => {
+                const registrosDelMes = meses[mesClave];
+
+                // Ordenar registros por fecha descendente
+                registrosDelMes.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+                // Crear tabla para el mes
+                const tabla = document.createElement('table');
+                const thead = document.createElement('thead');
+                const tbody = document.createElement('tbody');
+                const tfoot = document.createElement('tfoot');
+
+                // Título del mes
+                const tituloMes = document.createElement('h2');
+                const opcionesFecha = { month: 'long', year: 'numeric' };
+                const fechaMes = new Date(`${mesClave}-01`);
+                tituloMes.textContent = fechaMes.toLocaleDateString('es-ES', opcionesFecha).toUpperCase();
+                contenedorTablas.appendChild(tituloMes);
+
+                // Botón para descargar CSV del mes
+                const botonCSV = document.createElement('button');
+                botonCSV.textContent = 'Descargar CSV del Mes';
+                botonCSV.classList.add('boton-csv');
+                botonCSV.onclick = () => exportarCSV(mesClave);
+                contenedorTablas.appendChild(botonCSV);
+
+                // Encabezados de la tabla
+                thead.innerHTML = `
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Número de Conductor</th>
+                        <th>Línea</th>
+                        <th>Número de Turno</th>
+                        <th>Hora Inicio (Hoja)</th>
+                        <th>Hora Fin (Hoja)</th>
+                        <th>Tiempo Total (Hoja)</th>
+                        <th>Login</th>
+                        <th>Logout</th>
+                        <th>Tiempo Operativo</th>
+                        <th>Exceso de Jornada</th>
+                        <th>Número de Autobús</th>
+                        <th>Total Viajeros</th>
+                        <th>Venta Billetes</th>
+                        <th>Observaciones</th>
+                    </tr>
+                `;
+
+                // Variables para totales mensuales
+                let tiemposTotalHoja = [];
+                let tiemposOperativo = [];
+                let excesosJornada = [];
+                let totalViajerosMes = 0;
+                let totalVentaBilletesMes = 0;
+                let totalLiquidacionMes = 0;
+
+                // Llenar la tabla con registros
+                registrosDelMes.forEach(registro => {
+                    const fila = document.createElement('tr');
+
+                    if (registro.diaLibre) {
+                        fila.classList.add('dia-libre');
+                    }
+
+                    fila.innerHTML = `
+                        <td>${registro.fecha}</td>
+                        <td>${registro.numeroConductor}</td>
+                        <td>${registro.linea}</td>
+                        <td>${registro.numeroTurno}</td>
+                        <td>${registro.horaInicioHoja}</td>
+                        <td>${registro.horaFinHoja}</td>
+                        <td>${registro.tiempoTotalHoja}</td>
+                        <td>${registro.login}</td>
+                        <td>${registro.logout}</td>
+                        <td>${registro.tiempoOperativo}</td>
+                        <td>${registro.excesoJornada}</td>
+                        <td>${registro.numeroAutobus}</td>
+                        <td>${registro.totalViajeros}</td>
+                        <td>${registro.ventaBilletes}</td>
+                        <td>${registro.observaciones}</td>
+                    `;
+
+                    // Resaltar exceso de jornada
+                    const celdaExceso = fila.querySelector('td:nth-child(11)');
+                    if (registro.excesoJornada !== '00:00') {
+                        celdaExceso.classList.add('exceso-jornada');
+                    } else {
+                        celdaExceso.classList.remove('exceso-jornada');
+                    }
+
+                    fila.addEventListener('click', () => rellenarFormulario(registro));
+
+                    tbody.appendChild(fila);
+
+                    // Acumular totales mensuales
+                    if (registro.tiempoTotalHoja && registro.tiempoTotalHoja !== '00:00') {
+                        tiemposTotalHoja.push(registro.tiempoTotalHoja);
+                    }
+                    if (registro.tiempoOperativo && registro.tiempoOperativo !== '00:00') {
+                        tiemposOperativo.push(registro.tiempoOperativo);
+                    }
+                    if (registro.excesoJornada && registro.excesoJornada !== '00:00') {
+                        excesosJornada.push(registro.excesoJornada);
+                    }
+
+                    totalViajerosMes += registro.totalViajeros || 0;
+                    totalVentaBilletesMes += registro.ventaBilletes || 0;
+                    totalLiquidacionMes += parseFloat(registro.liquidacionTotal) || 0;
+                });
+
+                // Totales mensuales
+                const totalTiempoHojaMes = sumarTiempos(tiemposTotalHoja);
+                const totalTiempoOperativoMes = sumarTiempos(tiemposOperativo);
+                const totalExcesoJornadaMes = sumarTiempos(excesosJornada);
+
+                tfoot.innerHTML = `
+                    <tr>
+                        <td colspan="6"><strong>Total Mes:</strong></td>
+                        <td>${totalTiempoHojaMes}</td>
+                        <td></td>
+                        <td></td>
+                        <td>${totalTiempoOperativoMes}</td>
+                        <td>${totalExcesoJornadaMes}</td>
+                        <td>${totalViajerosMes}</td>
+                        <td>${totalVentaBilletesMes}</td>
+                        <td></td>
+                    </tr>
+                `;
+
+                tabla.appendChild(thead);
+                tabla.appendChild(tbody);
+                tabla.appendChild(tfoot);
+                contenedorTablas.appendChild(tabla);
+            });
+
+            // Después de las tablas mensuales, agregamos el resumen anual
+            añosOrdenados.forEach(año => {
+                const datosAnuales = calcularTotalesAnuales({ [año]: registrosPorAño[año] });
+
+                const contenedorAnual = document.createElement('div');
+                contenedorAnual.id = `contenedorAnual-${año}`;
+
+                // Título del año
+                const tituloAnual = document.createElement('h3');
+                tituloAnual.textContent = `Resumen Anual ${año}`;
+                contenedorAnual.appendChild(tituloAnual);
+
+                // Botón para descargar CSV anual
+                const botonCSVAnual = document.createElement('button');
+                botonCSVAnual.textContent = 'Descargar CSV Anual';
+                botonCSVAnual.classList.add('boton-csv');
+                botonCSVAnual.onclick = () => exportarCSVAnual(año);
+                contenedorAnual.appendChild(botonCSVAnual);
+
+                // Crear tabla anual
+                const tablaAnual = document.createElement('table');
+                const theadAnual = document.createElement('thead');
+                const tbodyAnual = document.createElement('tbody');
+
+                // Encabezados
+                theadAnual.innerHTML = `
+                    <tr>
+                        <th>Año</th>
+                        <th>Tiempo Total (Hoja)</th>
+                        <th>Tiempo Operativo</th>
+                        <th>Exceso de Jornada</th>
+                        <th>Total Viajeros</th>
+                        <th>Venta Billetes</th>
+                        <th>Liquidación Total</th>
+                    </tr>
+                `;
+
+                // Totales anuales
+                const tiempoTotalHojaAnual = sumarTiempos(datosAnuales.tiemposTotalHoja);
+                const tiempoOperativoAnual = sumarTiempos(datosAnuales.tiemposOperativo);
+                const excesoJornadaAnual = sumarTiempos(datosAnuales.excesosJornada);
+                const totalViajerosAnual = datosAnuales.totalViajeros;
+                const totalVentaBilletesAnual = datosAnuales.totalVentaBilletes;
+                const totalLiquidacionAnual = datosAnuales.totalLiquidacion.toFixed(2) + '€';
+
+                tbodyAnual.innerHTML = `
+                    <tr>
+                        <td>${año}</td>
+                        <td>${tiempoTotalHojaAnual}</td>
+                        <td>${tiempoOperativoAnual}</td>
+                        <td>${excesoJornadaAnual}</td>
+                        <td>${totalViajerosAnual}</td>
+                        <td>${totalVentaBilletesAnual}</td>
+                        <td>${totalLiquidacionAnual}</td>
+                    </tr>
+                `;
+
+                tablaAnual.appendChild(theadAnual);
+                tablaAnual.appendChild(tbodyAnual);
+                contenedorAnual.appendChild(tablaAnual);
+
+                // Agregar el contenedor anual después de las tablas mensuales del año
+                contenedorTablas.appendChild(contenedorAnual);
+            });
+        });
+    }
+
+    function calcularTotalesAnuales(meses) {
+        const datosAnuales = {
+            tiemposTotalHoja: [],
+            tiemposOperativo: [],
+            excesosJornada: [],
+            totalViajeros: 0,
+            totalVentaBilletes: 0,
+            totalLiquidacion: 0
+        };
+
+        Object.values(meses).forEach(registrosDelMes => {
+            let tiemposTotalHoja = [];
+            let tiemposOperativo = [];
+            let excesosJornada = [];
+            let totalViajerosMes = 0;
+            let totalVentaBilletesMes = 0;
+            let totalLiquidacionMes = 0;
+
+            registrosDelMes.forEach(registro => {
+                if (registro.tiempoTotalHoja && registro.tiempoTotalHoja !== '00:00') {
+                    tiemposTotalHoja.push(registro.tiempoTotalHoja);
+                }
+                if (registro.tiempoOperativo && registro.tiempoOperativo !== '00:00') {
+                    tiemposOperativo.push(registro.tiempoOperativo);
+                }
+                if (registro.excesoJornada && registro.excesoJornada !== '00:00') {
+                    excesosJornada.push(registro.excesoJornada);
+                }
+                totalViajerosMes += registro.totalViajeros || 0;
+                totalVentaBilletesMes += registro.ventaBilletes || 0;
+                totalLiquidacionMes += parseFloat(registro.liquidacionTotal) || 0;
+            });
+
+            const totalTiempoHojaMes = sumarTiempos(tiemposTotalHoja);
+            const totalTiempoOperativoMes = sumarTiempos(tiemposOperativo);
+            const totalExcesoJornadaMes = sumarTiempos(excesosJornada);
+
+            datosAnuales.tiemposTotalHoja.push(totalTiempoHojaMes);
+            datosAnuales.tiemposOperativo.push(totalTiempoOperativoMes);
+            datosAnuales.excesosJornada.push(totalExcesoJornadaMes);
+            datosAnuales.totalViajeros += totalViajerosMes;
+            datosAnuales.totalVentaBilletes += totalVentaBilletesMes;
+            datosAnuales.totalLiquidacion += totalLiquidacionMes;
+        });
+
+        return datosAnuales;
+    }
+
+    function rellenarFormulario(registro) {
+        document.getElementById('fecha').value = registro.fecha;
+        document.getElementById('numeroConductor').value = registro.numeroConductor;
+        document.getElementById('linea').value = registro.linea;
+        document.getElementById('numeroTurno').value = registro.numeroTurno;
+        document.getElementById('horaInicioHoja').value = registro.horaInicioHoja;
+        document.getElementById('horaFinHoja').value = registro.horaFinHoja;
+        document.getElementById('login').value = registro.login;
+        document.getElementById('logout').value = registro.logout;
+        document.getElementById('numeroAutobus').value = registro.numeroAutobus;
+        document.getElementById('totalViajeros').value = registro.totalViajeros;
+        document.getElementById('ventaBilletes').value = registro.ventaBilletes;
+        document.getElementById('observaciones').value = registro.observaciones;
+    }
+
+    function exportarCSV(mesClave) {
+        const registrosDelMes = registros.filter(registro => {
+            const fechaRegistro = new Date(registro.fecha);
+            const año = fechaRegistro.getFullYear();
+            const mes = fechaRegistro.getMonth() + 1;
+            const clave = `${año}-${('0' + mes).slice(-2)}`;
+            return clave === mesClave;
+        });
+
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "Fecha,Número de Conductor,Línea,Número de Turno,Hora Inicio (Hoja),Hora Fin (Hoja),Tiempo Total (Hoja),Login,Logout,Tiempo Operativo,Exceso de Jornada,Número de Autobús,Total Viajeros,Venta Billetes,Observaciones\n";
+
+        registrosDelMes.forEach(registro => {
+            const fila = [
+                registro.fecha,
+                registro.numeroConductor,
+                registro.linea,
+                registro.numeroTurno,
+                registro.horaInicioHoja,
+                registro.horaFinHoja,
+                registro.tiempoTotalHoja,
+                registro.login,
+                registro.logout,
+                registro.tiempoOperativo,
+                registro.excesoJornada,
+                registro.numeroAutobus,
+                registro.totalViajeros,
+                registro.ventaBilletes,
+                registro.observaciones
+            ].join(',');
+
+            csvContent += fila + "\n";
+        });
+
+        // Agregar totales mensuales
+        const tiemposTotalHoja = registrosDelMes.map(r => r.tiempoTotalHoja);
+        const tiemposOperativo = registrosDelMes.map(r => r.tiempoOperativo);
+        const excesosJornada = registrosDelMes.map(r => r.excesoJornada);
+        const totalViajerosMes = registrosDelMes.reduce((acc, r) => acc + r.totalViajeros, 0);
+        const totalVentaBilletesMes = registrosDelMes.reduce((acc, r) => acc + r.ventaBilletes, 0);
+
+        const totalTiempoHojaMes = sumarTiempos(tiemposTotalHoja);
+        const totalTiempoOperativoMes = sumarTiempos(tiemposOperativo);
+        const totalExcesoJornadaMes = sumarTiempos(excesosJornada);
+
+        csvContent += `,,,,,,${totalTiempoHojaMes},,,${totalTiempoOperativoMes},${totalExcesoJornadaMes},,${totalViajerosMes},${totalVentaBilletesMes},\n`;
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `registros_${mesClave}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function exportarCSVAnual(año) {
+        const registrosDelAño = registros.filter(registro => {
+            const fechaRegistro = new Date(registro.fecha);
+            return fechaRegistro.getFullYear() == año;
+        });
+
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "Año,Tiempo Total (Hoja),Tiempo Operativo,Exceso de Jornada,Total Viajeros,Venta Billetes,Liquidación Total\n";
+
+        const datosAnuales = calcularTotalesAnuales({ [año]: { [año + '-01']: registrosDelAño } });
+
+        const tiempoTotalHojaAnual = sumarTiempos(datosAnuales.tiemposTotalHoja);
+        const tiempoOperativoAnual = sumarTiempos(datosAnuales.tiemposOperativo);
+        const excesoJornadaAnual = sumarTiempos(datosAnuales.excesosJornada);
+        const totalViajerosAnual = datosAnuales.totalViajeros;
+        const totalVentaBilletesAnual = datosAnuales.totalVentaBilletes;
+        const totalLiquidacionAnual = datosAnuales.totalLiquidacion.toFixed(2) + '€';
+
+        csvContent += `${año},${tiempoTotalHojaAnual},${tiempoOperativoAnual},${excesoJornadaAnual},${totalViajerosAnual},${totalVentaBilletesAnual},${totalLiquidacionAnual}\n`;
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `resumen_anual_${año}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function eliminarRegistros() {
+        if (confirm('¿Estás seguro de que deseas eliminar todos los registros? Esta acción no se puede deshacer.')) {
+            registros = [];
+            localStorage.removeItem('registros');
+            actualizarTablas();
+        }
+    }
+
+    // Cargar registros desde LocalStorage al iniciar
+    document.addEventListener('DOMContentLoaded', function() {
+        if (localStorage.getItem('registros')) {
+            registros = JSON.parse(localStorage.getItem('registros'));
+        }
+        actualizarTablas();
+    });
+</script>
+
+</body>
+</html>
