@@ -184,11 +184,16 @@
 <button class="boton-eliminar" onclick="eliminarRegistros()">Eliminar Registros</button>
 
 <script>
-    // Variables globales
     let registros = [];
-    let registrosPorAño = {};
 
-    // Funciones globales
+    // Cargar registros desde LocalStorage al iniciar
+    window.onload = function() {
+        if (localStorage.getItem('registros')) {
+            registros = JSON.parse(localStorage.getItem('registros'));
+            actualizarTablas();
+        }
+    };
+
     function guardarRegistrosLocalStorage() {
         localStorage.setItem('registros', JSON.stringify(registros));
     }
@@ -335,10 +340,8 @@
         let totalMinutos = 0;
 
         tiempos.forEach(tiempo => {
-            if (tiempo && tiempo.includes(':')) {
-                const [h, m] = tiempo.split(':').map(Number);
-                totalMinutos += h * 60 + m;
-            }
+            const [h, m] = tiempo.split(':').map(Number);
+            totalMinutos += h * 60 + m;
         });
 
         return minutosAHoraMinutos(totalMinutos);
@@ -348,7 +351,7 @@
         const contenedorTablas = document.getElementById('contenedorTablas');
         contenedorTablas.innerHTML = '';
 
-        registrosPorAño = {};
+        const registrosPorAño = {};
 
         // Agrupar registros por año y mes
         registros.forEach(registro => {
@@ -467,19 +470,12 @@
                     tbody.appendChild(fila);
 
                     // Acumular totales mensuales
-                    if (registro.tiempoTotalHoja && registro.tiempoTotalHoja !== '00:00') {
-                        tiemposTotalHoja.push(registro.tiempoTotalHoja);
-                    }
-                    if (registro.tiempoOperativo && registro.tiempoOperativo !== '00:00') {
-                        tiemposOperativo.push(registro.tiempoOperativo);
-                    }
-                    if (registro.excesoJornada && registro.excesoJornada !== '00:00') {
-                        excesosJornada.push(registro.excesoJornada);
-                    }
-
-                    totalViajerosMes += registro.totalViajeros || 0;
-                    totalVentaBilletesMes += registro.ventaBilletes || 0;
-                    totalLiquidacionMes += parseFloat(registro.liquidacionTotal) || 0;
+                    tiemposTotalHoja.push(registro.tiempoTotalHoja);
+                    tiemposOperativo.push(registro.tiempoOperativo);
+                    excesosJornada.push(registro.excesoJornada);
+                    totalViajerosMes += registro.totalViajeros;
+                    totalVentaBilletesMes += registro.ventaBilletes;
+                    totalLiquidacionMes += parseFloat(registro.liquidacionTotal);
                 });
 
                 // Totales mensuales
@@ -508,69 +504,67 @@
             });
 
             // Después de las tablas mensuales, agregamos el resumen anual
-            añosOrdenados.forEach(año => {
-                const datosAnuales = calcularTotalesAnuales({ [año]: registrosPorAño[año] });
+            const datosAnuales = calcularTotalesAnuales(registrosPorAño[año]);
 
-                const contenedorAnual = document.createElement('div');
-                contenedorAnual.id = `contenedorAnual-${año}`;
+            const contenedorAnual = document.createElement('div');
+            contenedorAnual.id = `contenedorAnual-${año}`;
 
-                // Título del año
-                const tituloAnual = document.createElement('h3');
-                tituloAnual.textContent = `Resumen Anual ${año}`;
-                contenedorAnual.appendChild(tituloAnual);
+            // Título del año
+            const tituloAnual = document.createElement('h3');
+            tituloAnual.textContent = `Resumen Anual ${año}`;
+            contenedorAnual.appendChild(tituloAnual);
 
-                // Botón para descargar CSV anual
-                const botonCSVAnual = document.createElement('button');
-                botonCSVAnual.textContent = 'Descargar CSV Anual';
-                botonCSVAnual.classList.add('boton-csv');
-                botonCSVAnual.onclick = () => exportarCSVAnual(año);
-                contenedorAnual.appendChild(botonCSVAnual);
+            // Botón para descargar CSV anual
+            const botonCSVAnual = document.createElement('button');
+            botonCSVAnual.textContent = 'Descargar CSV Anual';
+            botonCSVAnual.classList.add('boton-csv');
+            botonCSVAnual.onclick = () => exportarCSVAnual(año);
+            contenedorAnual.appendChild(botonCSVAnual);
 
-                // Crear tabla anual
-                const tablaAnual = document.createElement('table');
-                const theadAnual = document.createElement('thead');
-                const tbodyAnual = document.createElement('tbody');
+            // Crear tabla anual
+            const tablaAnual = document.createElement('table');
+            const theadAnual = document.createElement('thead');
+            const tbodyAnual = document.createElement('tbody');
 
-                // Encabezados
-                theadAnual.innerHTML = `
-                    <tr>
-                        <th>Año</th>
-                        <th>Tiempo Total (Hoja)</th>
-                        <th>Tiempo Operativo</th>
-                        <th>Exceso de Jornada</th>
-                        <th>Total Viajeros</th>
-                        <th>Venta Billetes</th>
-                        <th>Liquidación Total</th>
-                    </tr>
-                `;
+            // Encabezados
+            theadAnual.innerHTML = `
+                <tr>
+                    <th>Año</th>
+                    <th>Tiempo Total (Hoja)</th>
+                    <th>Tiempo Operativo</th>
+                    <th>Exceso de Jornada</th>
+                    <th>Total Viajeros</th>
+                    <th>Venta Billetes</th>
+                    <th>Liquidación Total</th>
+                </tr>
+            `;
 
-                // Totales anuales
-                const tiempoTotalHojaAnual = sumarTiempos(datosAnuales.tiemposTotalHoja);
-                const tiempoOperativoAnual = sumarTiempos(datosAnuales.tiemposOperativo);
-                const excesoJornadaAnual = sumarTiempos(datosAnuales.excesosJornada);
-                const totalViajerosAnual = datosAnuales.totalViajeros;
-                const totalVentaBilletesAnual = datosAnuales.totalVentaBilletes;
-                const totalLiquidacionAnual = datosAnuales.totalLiquidacion.toFixed(2) + '€';
+            // Totales anuales
+            const tiempoTotalHojaAnual = sumarTiempos(datosAnuales.tiemposTotalHoja);
+            const tiempoOperativoAnual = sumarTiempos(datosAnuales.tiemposOperativo);
+            const excesoJornadaAnual = sumarTiempos(datosAnuales.excesosJornada);
+            const totalViajerosAnual = datosAnuales.totalViajeros;
+            const totalVentaBilletesAnual = datosAnuales.totalVentaBilletes;
+            const totalLiquidacionAnual = datosAnuales.totalLiquidacion.toFixed(2) + '€';
 
-                tbodyAnual.innerHTML = `
-                    <tr>
-                        <td>${año}</td>
-                        <td>${tiempoTotalHojaAnual}</td>
-                        <td>${tiempoOperativoAnual}</td>
-                        <td>${excesoJornadaAnual}</td>
-                        <td>${totalViajerosAnual}</td>
-                        <td>${totalVentaBilletesAnual}</td>
-                        <td>${totalLiquidacionAnual}</td>
-                    </tr>
-                `;
+            tbodyAnual.innerHTML = `
+                <tr>
+                    <td>${año}</td>
+                    <td>${tiempoTotalHojaAnual}</td>
+                    <td>${tiempoOperativoAnual}</td>
+                    <td>${excesoJornadaAnual}</td>
+                    <td>${totalViajerosAnual}</td>
+                    <td>${totalVentaBilletesAnual}</td>
+                    <td>${totalLiquidacionAnual}</td>
+                </tr>
+            `;
 
-                tablaAnual.appendChild(theadAnual);
-                tablaAnual.appendChild(tbodyAnual);
-                contenedorAnual.appendChild(tablaAnual);
+            tablaAnual.appendChild(theadAnual);
+            tablaAnual.appendChild(tbodyAnual);
+            contenedorAnual.appendChild(tablaAnual);
 
-                // Agregar el contenedor anual después de las tablas mensuales del año
-                contenedorTablas.appendChild(contenedorAnual);
-            });
+            // Agregar el contenedor anual después de las tablas mensuales del año
+            contenedorTablas.appendChild(contenedorAnual);
         });
     }
 
@@ -593,18 +587,12 @@
             let totalLiquidacionMes = 0;
 
             registrosDelMes.forEach(registro => {
-                if (registro.tiempoTotalHoja && registro.tiempoTotalHoja !== '00:00') {
-                    tiemposTotalHoja.push(registro.tiempoTotalHoja);
-                }
-                if (registro.tiempoOperativo && registro.tiempoOperativo !== '00:00') {
-                    tiemposOperativo.push(registro.tiempoOperativo);
-                }
-                if (registro.excesoJornada && registro.excesoJornada !== '00:00') {
-                    excesosJornada.push(registro.excesoJornada);
-                }
-                totalViajerosMes += registro.totalViajeros || 0;
-                totalVentaBilletesMes += registro.ventaBilletes || 0;
-                totalLiquidacionMes += parseFloat(registro.liquidacionTotal) || 0;
+                tiemposTotalHoja.push(registro.tiempoTotalHoja);
+                tiemposOperativo.push(registro.tiempoOperativo);
+                excesosJornada.push(registro.excesoJornada);
+                totalViajerosMes += registro.totalViajeros;
+                totalVentaBilletesMes += registro.ventaBilletes;
+                totalLiquidacionMes += parseFloat(registro.liquidacionTotal);
             });
 
             const totalTiempoHojaMes = sumarTiempos(tiemposTotalHoja);
@@ -702,7 +690,7 @@
         let csvContent = "data:text/csv;charset=utf-8,";
         csvContent += "Año,Tiempo Total (Hoja),Tiempo Operativo,Exceso de Jornada,Total Viajeros,Venta Billetes,Liquidación Total\n";
 
-        const datosAnuales = calcularTotalesAnuales({ [año]: { [año + '-01']: registrosDelAño } });
+        const datosAnuales = calcularTotalesAnuales({ [año]: registrosPorAño[año] });
 
         const tiempoTotalHojaAnual = sumarTiempos(datosAnuales.tiemposTotalHoja);
         const tiempoOperativoAnual = sumarTiempos(datosAnuales.tiemposOperativo);
@@ -729,14 +717,6 @@
             actualizarTablas();
         }
     }
-
-    // Cargar registros desde LocalStorage al iniciar
-    document.addEventListener('DOMContentLoaded', function() {
-        if (localStorage.getItem('registros')) {
-            registros = JSON.parse(localStorage.getItem('registros'));
-        }
-        actualizarTablas();
-    });
 </script>
 
 </body>
