@@ -44,14 +44,17 @@
         .botones-accion {
             display: flex;
             justify-content: space-between;
+            flex-wrap: wrap;
         }
         .botones-accion button {
-            width: 32%;
+            flex: 1 1 30%;
+            margin: 5px;
             background-color: #007bff;
             color: #ffffff;
             border: none;
             cursor: pointer;
-            margin-bottom: 0;
+            padding: 10px;
+            font-size: 16px;
         }
         .botones-accion button:hover {
             background-color: #0056b3;
@@ -84,9 +87,9 @@
             background-color: #d1ecf1 !important;
         }
         .exceso-jornada {
-            background-color: #fff3cd !important; /* Fondo amarillo claro */
-            font-weight: bold; /* Números en negrita */
-            color: #856404; /* Texto color oscuro */
+            background-color: #fff3cd !important;
+            font-weight: bold;
+            color: #856404;
         }
         /* Botón de descargar CSV */
         .boton-csv {
@@ -120,6 +123,37 @@
         }
         .boton-eliminar:hover {
             background-color: #c82333;
+        }
+        /* Estilos para los nuevos botones */
+        .boton-exportar {
+            display: inline-block;
+            margin: 10px;
+            padding: 8px 12px;
+            background-color: #17a2b8;
+            color: #ffffff;
+            text-align: center;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .boton-exportar:hover {
+            background-color: #138496;
+        }
+        .boton-importar {
+            display: inline-block;
+            margin: 10px;
+            padding: 8px 12px;
+            background-color: #ffc107;
+            color: #212529;
+            text-align: center;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .boton-importar:hover {
+            background-color: #e0a800;
         }
     </style>
 </head>
@@ -177,6 +211,13 @@
     </div>
 </form>
 
+<!-- Nuevos botones para exportar e importar datos -->
+<div id="contenedorBotonesExportImport" style="text-align: center;">
+    <button class="boton-exportar" onclick="exportarDatos()">Exportar Datos</button>
+    <button class="boton-importar" onclick="document.getElementById('inputImportar').click()">Importar Datos</button>
+    <input type="file" id="inputImportar" accept=".json" style="display: none;" onchange="importarDatos(event)">
+</div>
+
 <div id="contenedorTablas">
     <!-- Las tablas mensuales y anuales se insertarán aquí -->
 </div>
@@ -184,15 +225,17 @@
 <button class="boton-eliminar" onclick="eliminarRegistros()">Eliminar Registros</button>
 
 <script>
+    // Variables globales
     let registros = [];
+    let registrosPorAño = {};
 
     // Cargar registros desde LocalStorage al iniciar
-    window.onload = function() {
+    document.addEventListener('DOMContentLoaded', function() {
         if (localStorage.getItem('registros')) {
             registros = JSON.parse(localStorage.getItem('registros'));
             actualizarTablas();
         }
-    };
+    });
 
     function guardarRegistrosLocalStorage() {
         localStorage.setItem('registros', JSON.stringify(registros));
@@ -221,6 +264,12 @@
             observaciones: document.getElementById('observaciones').value || '',
             diaLibre: false
         };
+
+        // Validar campos requeridos
+        if (!registro.fecha || !registro.numeroConductor || !registro.linea || !registro.numeroTurno || !registro.horaInicioHoja || !registro.horaFinHoja || !registro.login || !registro.logout || !registro.numeroAutobus) {
+            alert('Por favor, completa todos los campos obligatorios.');
+            return;
+        }
 
         // Cálculos de tiempos
         registro.tiempoTotalHoja = calcularDiferenciaHoras(registro.horaInicioHoja, registro.horaFinHoja);
@@ -351,7 +400,7 @@
         const contenedorTablas = document.getElementById('contenedorTablas');
         contenedorTablas.innerHTML = '';
 
-        const registrosPorAño = {};
+        registrosPorAño = {};
 
         // Agrupar registros por año y mes
         registros.forEach(registro => {
@@ -491,6 +540,7 @@
                         <td></td>
                         <td>${totalTiempoOperativoMes}</td>
                         <td>${totalExcesoJornadaMes}</td>
+                        <td></td>
                         <td>${totalViajerosMes}</td>
                         <td>${totalVentaBilletesMes}</td>
                         <td></td>
@@ -682,15 +732,15 @@
     }
 
     function exportarCSVAnual(año) {
-        const registrosDelAño = registros.filter(registro => {
-            const fechaRegistro = new Date(registro.fecha);
-            return fechaRegistro.getFullYear() == año;
-        });
+        if (!registrosPorAño[año]) {
+            alert('No hay datos para el año seleccionado.');
+            return;
+        }
 
         let csvContent = "data:text/csv;charset=utf-8,";
         csvContent += "Año,Tiempo Total (Hoja),Tiempo Operativo,Exceso de Jornada,Total Viajeros,Venta Billetes,Liquidación Total\n";
 
-        const datosAnuales = calcularTotalesAnuales({ [año]: registrosPorAño[año] });
+        const datosAnuales = calcularTotalesAnuales(registrosPorAño[año]);
 
         const tiempoTotalHojaAnual = sumarTiempos(datosAnuales.tiemposTotalHoja);
         const tiempoOperativoAnual = sumarTiempos(datosAnuales.tiemposOperativo);
@@ -716,6 +766,45 @@
             localStorage.removeItem('registros');
             actualizarTablas();
         }
+    }
+
+    // Función para exportar todos los datos
+    function exportarDatos() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(registros));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "registros.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+    // Función para importar datos
+    function importarDatos(event) {
+        const file = event.target.files[0];
+        if (file) {
+            if (confirm('Al importar los datos, se reemplazarán los registros actuales y se perderán las entradas existentes. ¿Deseas continuar?')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        if (Array.isArray(importedData)) {
+                            registros = importedData;
+                            guardarRegistrosLocalStorage();
+                            actualizarTablas();
+                            alert('Datos importados correctamente.');
+                        } else {
+                            alert('El archivo no tiene el formato correcto.');
+                        }
+                    } catch (error) {
+                        alert('Hubo un error al leer el archivo. Asegúrate de que es un archivo JSON válido.');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+        // Resetear el input para permitir importar el mismo archivo nuevamente si se desea
+        event.target.value = '';
     }
 </script>
 
